@@ -23,7 +23,7 @@ module LIFX
     # @param id: [String] Device ID of the Light
     # @param site_id: [String] Site ID of the Light. Avoid using when possible.
     # @param label: [String] Label of Light to prepopulate
-    def initialize(context: required!(:context), id: id, site_id: nil, label: nil)
+    def initialize(context: required!(:context), id: id(), site_id: nil, label: nil)
       @context = context
       @id = id
       @site_id = site_id
@@ -193,18 +193,6 @@ module LIFX
       Time.now.to_f - start
     end
 
-    # Returns the mesh firmware details
-    # @api private
-    # @return [Hash] firmware details
-    def mesh_firmware(fetch: true)
-      @mesh_firmware ||= begin
-        send_message!(Protocol::Device::GetMeshFirmware.new,
-          wait_for: Protocol::Device::StateMeshFirmware) do |payload|
-          Firmware.new(payload)
-        end if fetch
-      end
-    end
-
     # Returns the wifi firmware details
     # @api private
     # @return [Hash] firmware details
@@ -223,20 +211,6 @@ module LIFX
       send_message!(Protocol::Light::GetTemperature.new,
           wait_for: Protocol::Light::StateTemperature) do |payload|
         payload.temperature / 100.0
-      end
-    end
-
-    # Returns mesh network info
-    # @api private
-    # @return [Hash] Mesh network info
-    def mesh_info
-      send_message!(Protocol::Device::GetMeshInfo.new,
-          wait_for: Protocol::Device::StateMeshInfo) do |payload|
-        {
-          signal: payload.signal, # This is in Milliwatts
-          tx: payload.tx,
-          rx: payload.rx
-        }
       end
     end
 
@@ -363,7 +337,7 @@ module LIFX
     end
 
     # An exception for when synchronous messages take too long to receive a response
-    class MessageTimeout < TimeoutError
+    class MessageTimeout < Timeout::Error
       attr_accessor :device
     end
 
@@ -374,7 +348,7 @@ module LIFX
     # @param block: [Proc] the block that is executed when the expected `wait_for` payload comes back. If the return value is false or nil, it will try to send the message again.
     # @return [Object] the truthy result of `block` is returned.
     # @raise [MessageTimeout] if the device doesn't respond in time
-    def send_message!(payload, wait_for: wait_for, wait_timeout: Config.message_wait_timeout, retry_interval: Config.message_retry_interval, &block)
+    def send_message!(payload, wait_for: wait_for(), wait_timeout: Config.message_wait_timeout, retry_interval: Config.message_retry_interval, &block)
       if Thread.current[:sync_enabled]
         raise "Cannot use synchronous methods inside a sync block"
       end
@@ -425,11 +399,6 @@ module LIFX
 
       add_hook(Protocol::Device::StatePower) do |payload|
         @power = payload.level.to_i
-        seen!
-      end
-
-      add_hook(Protocol::Device::StateMeshFirmware) do |payload|
-        @mesh_firmware = Firmware.new(payload)
         seen!
       end
 

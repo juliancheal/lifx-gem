@@ -1,13 +1,15 @@
 module LIFX
   # @private
   class RoutingTable
+    include Logging
+
     class Entry < Struct.new(:site_id, :device_id, :tag_ids, :last_seen); end
     # RoutingTable stores the device <-> site mapping
     def initialize(entries: {})
       @device_site_mapping = entries
     end
 
-    def update_table(site_id: site_id, device_id: device_id, tag_ids: nil, last_seen: Time.now)
+    def update_table(site_id: site_id(), device_id: device_id(), tag_ids: nil, last_seen: Time.now)
       device_mapping = @device_site_mapping[device_id] ||= Entry.new(site_id, device_id, [])
       device_mapping.site_id = site_id
       device_mapping.last_seen = last_seen
@@ -25,6 +27,10 @@ module LIFX
 
     def site_ids
       entries.map(&:site_id).uniq
+    end
+
+    def device_ids
+      entries.map(&:device_id).uniq
     end
 
     def entries
