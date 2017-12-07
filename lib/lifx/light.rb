@@ -185,6 +185,15 @@ module LIFX
       delta = device_time - Time.now
     end
 
+    def power_level(fetch: true)
+      @power_level ||= begin
+        send_message!(Protocol::Device::GetPower.new,
+            wait_for: Protocol::Device::StatePower) do |payload|
+          payload.inspect
+        end
+      end
+    end
+
     # Pings the device and measures response time.
     # @return [Float] Latency from sending a message to receiving a response.
     def latency
